@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prenotazione sale — Oratori di Mendrisio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --stone:#EAE3D3; --stone-dark:#DCD2BA;
+    --ink:#2B2A26; --ink-soft:#5B584E;
+    --burgundy:#7A2E2E; --burgundy-dark:#5E2222;
+    --gold:#B8862E; --sage:#5C7A52; --sage-dark:#456039;
+    --paper:#FBF9F4; --line:#CDC3A9;
+    --san-giovanni:#3C6E58; --santa-maria:#7A2E2E;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--stone);color:var(--ink);font-family:'Source Sans 3', sans-serif;font-size:16px;line-height:1.5;}
+  h1,h2,h3,.serif{font-family:'Fraunces', serif;}
+  a{color:var(--burgundy);}
+
+  .shell{max-width:1040px;margin:0 auto;padding:0 24px 80px;}
+  header.top{padding:36px 0 22px;border-bottom:2px solid var(--ink);}
+  .crest{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;justify-content:space-between;}
+  header.top h1{font-size:1.7rem;font-weight:600;margin:0;letter-spacing:-0.01em;}
+  header.top .sub{color:var(--ink-soft);font-size:0.95rem;margin-top:4px;}
+
+  .who{display:flex;align-items:center;gap:10px;font-size:0.85rem;color:var(--ink-soft);}
+  .who button{background:none;border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;font-size:0.82rem;color:var(--ink-soft);}
+  .who button:hover{border-color:var(--burgundy);color:var(--burgundy);}
+
+  nav.tabs{display:flex;gap:2px;margin-top:22px;flex-wrap:wrap;}
+  nav.tabs button{font-family:'Fraunces',serif;font-size:1rem;background:none;border:none;padding:11px 18px;cursor:pointer;color:var(--ink-soft);border-bottom:3px solid transparent;transition:color .15s ease;}
+  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--burgundy);font-weight:600;}
+  nav.tabs button:hover{color:var(--ink);}
+  nav.tabs button .lock{font-size:0.7rem;margin-left:4px;color:var(--ink-soft);}
+
+  section.page{display:none;padding-top:34px;}
+  section.page.active{display:block;}
+
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:32px;}
+  .sheet + .sheet{margin-top:20px;}
+
+  fieldset{border:none;padding:0;margin:0 0 30px;}
+  fieldset:last-of-type{margin-bottom:0;}
+  legend{font-family:'Fraunces',serif;font-size:1.05rem;font-weight:600;padding:0 0 6px;border-bottom:1px solid var(--line);width:100%;margin-bottom:16px;}
+  label.field{display:block;margin-bottom:16px;}
+  label.field span.lbl{display:block;font-size:0.88rem;color:var(--ink-soft);margin-bottom:5px;}
+  label.field span.lbl .req{color:var(--burgundy);}
+  input[type=text],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=password],select{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);
+    font-family:inherit;font-size:0.97rem;background:#fff;color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--burgundy);outline-offset:1px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px;}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr;}}
+
+  .room-pick{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:640px){.room-pick{grid-template-columns:1fr;}}
+  .room-opt{border:1px solid var(--line);border-radius:var(--radius);padding:14px;cursor:pointer;background:#fff;display:flex;align-items:flex-start;gap:10px;}
+  .room-opt.sel{border-color:var(--burgundy);box-shadow:0 0 0 1px var(--burgundy);}
+  .room-opt input{margin-top:3px;}
+  .room-opt .name{font-weight:600;}
+  .room-opt .desc{font-size:0.85rem;color:var(--ink-soft);margin-top:2px;}
+
+  .radio-row,.check-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line);}
+  .radio-row:last-child,.check-row:last-child{border-bottom:none;}
+  .radio-row input,.check-row input{margin-top:3px;}
+  .radio-row label,.check-row label{font-size:0.94rem;cursor:pointer;}
+  .hint{font-size:0.82rem;color:var(--ink-soft);margin-top:3px;}
+
+  .btn{font-family:'Source Sans 3',sans-serif;font-weight:600;font-size:0.95rem;padding:11px 22px;border-radius:var(--radius);border:1px solid var(--burgundy);background:var(--burgundy);color:#fff;cursor:pointer;}
+  .btn:hover{background:var(--burgundy-dark);}
+  .btn.ghost{background:none;color:var(--burgundy);}
+  .btn.ghost:hover{background:rgba(122,46,46,0.07);}
+  .btn.sage{border-color:var(--sage);background:var(--sage);}
+  .btn.sage:hover{background:var(--sage-dark);}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn.small{padding:6px 14px;font-size:0.85rem;}
+
+  .banner{margin-top:18px;padding:13px 16px;border-radius:var(--radius);font-size:0.92rem;display:none;}
+  .banner.ok{background:#EAF1E6;border:1px solid var(--sage);color:var(--sage-dark);display:block;}
+  .banner.err{background:#F7E9E3;border:1px solid var(--burgundy);color:var(--burgundy-dark);display:block;}
+
+  /* Calendar */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+  .cal-head h2{margin:0;font-size:1.3rem;}
+  .cal-nav{display:flex;gap:8px;}
+  .cal-nav button{border:1px solid var(--line);background:#fff;border-radius:var(--radius);padding:6px 13px;cursor:pointer;font-size:0.95rem;}
+  .legend{display:flex;gap:18px;margin-bottom:16px;font-size:0.85rem;color:var(--ink-soft);flex-wrap:wrap;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--line);border:1px solid var(--line);}
+  .cal-dow{background:var(--stone-dark);text-align:center;font-size:0.78rem;padding:6px 0;color:var(--ink-soft);font-weight:600;}
+  .cal-cell{background:var(--paper);min-height:88px;padding:6px;position:relative;}
+  .cal-cell.out{background:#F1EEE4;color:#BBB4A0;}
+  .cal-cell .num{font-size:0.8rem;color:var(--ink-soft);}
+  .cal-cell .chip{margin-top:4px;font-size:0.72rem;padding:2px 6px;border-radius:2px;color:#fff;display:block;line-height:1.3;cursor:pointer;}
+  .chip.sg{background:var(--san-giovanni);}
+  .chip.sm{background:var(--santa-maria);}
+
+  .daylist{margin-top:22px;}
+  .daylist h3{font-size:1rem;margin-bottom:10px;}
+  .booking-row{border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;background:#fff;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;}
+  .booking-row .meta{font-size:0.85rem;color:var(--ink-soft);}
+  .status-tag{font-size:0.75rem;font-weight:600;padding:3px 9px;border-radius:20px;height:fit-content;}
+  .status-tag.confirmed{background:#EAF1E6;color:var(--sage-dark);}
+  .status-tag.pending{background:#FBF0DC;color:var(--gold);}
+  .status-tag.rejected{background:#F7E9E3;color:var(--burgundy-dark);}
+
+  /* Report / Approvazione */
+  .report-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .filters{display:flex;gap:10px;flex-wrap:wrap;}
+  .filters select{width:auto;padding:7px 10px;}
+  table.report{width:100%;border-collapse:collapse;font-size:0.88rem;}
+  table.report th{text-align:left;font-family:'Fraunces',serif;font-weight:600;font-size:0.82rem;color:var(--ink-soft);padding:8px 10px;border-bottom:2px solid var(--ink);white-space:nowrap;}
+  table.report td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.report tr:hover td{background:#F4F0E4;}
+  .empty-state{padding:40px 10px;text-align:center;color:var(--ink-soft);}
+  .empty-state .serif{font-size:1.1rem;color:var(--ink);display:block;margin-bottom:6px;}
+
+  .login-box{max-width:360px;margin:0 auto;text-align:center;}
+  .login-box p.hint{margin-bottom:20px;}
+  .login-box label.field{text-align:left;}
+
+  .approval-card{border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;background:#fff;}
+  .approval-card .top-row{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
+  .approval-card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:0.88rem;margin:14px 0;}
+  .approval-card dt{color:var(--ink-soft);}
+  .approval-card dd{margin:0;}
+  .approval-card .actions{display:flex;gap:10px;margin-top:14px;}
+  .config-warning{background:#FBF0DC;border:1px solid var(--gold);color:#6b5115;padding:14px 16px;border-radius:var(--radius);font-size:0.9rem;margin-bottom:20px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="top">
+    <div class="crest">
+      <div>
+        <h1>Casa della Gioventù</h1>
+        <div class="sub">Prenotazione sale — Oratorio San Giovanni &amp; Oratorio Santa Maria, Mendrisio</div>
+      </div>
+      <div class="who" id="whoBox"></div>
+    </div>
+    <nav class="tabs">
+      <button data-page="prenota" class="active">Prenota</button>
+      <button data-page="calendario">Calendario</button>
+      <button data-page="report">Report <span class="lock">🔒</span></button>
+      <button data-page="approvazione">Approvazione <span class="lock">🔒</span></button>
+    </nav>
+  </header>
+
+  <div class="config-warning" id="configWarning" style="display:none;">
+    Configurazione mancante: apri il file e inserisci <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> in cima al codice (vedi README).
+  </div>
+
+  <!-- ============ PAGINA 1: PRENOTA ============ -->
+  <section class="page active" id="page-prenota">
+    <div class="sheet">
+      <form id="bookingForm" novalidate>
+
+        <fieldset>
+          <legend>Contatto</legend>
+          <label class="field">
+            <span class="lbl">Email <span class="req">*</span></span>
+            <input type="email" name="email" required>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Spazio</legend>
+          <div class="room-pick">
+            <label class="room-opt" id="opt-sm">
+              <input type="radio" name="spazio" value="Oratorio Santa Maria" required>
+              <div><div class="name">Oratorio Santa Maria</div>
+              <div class="desc">Grande salone, palco, buvette, cucina — via Santa Maria 5</div></div>
+            </label>
+            <label class="room-opt" id="opt-sg">
+              <input type="radio" name="spazio" value="Oratorio San Giovanni">
+              <div><div class="name">Oratorio San Giovanni</div>
+              <div class="desc">Sale interne, cucina, campo calcio/basket — via Vecchio Ginnasio 26</div></div>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Data e orario</legend>
+          <div class="grid2">
+            <label class="field"><span class="lbl">Data desiderata <span class="req">*</span></span><input type="date" name="data" required></label>
+            <label class="field"><span class="lbl">Orario desiderato <span class="req">*</span></span><input type="time" name="orario" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Per quale evento si richiede l'affitto? <span class="req">*</span></legend>
+          <div class="radio-row"><input type="radio" name="tipoEvento" id="ev1" value="Compleanno (mezza giornata, pomeriggio)" required><label for="ev1">Compleanno (affitto per mezza giornata, solitamente al pomeriggio)</label></div>
+          <div class="radio-row"><input type="radio" name="tipoEvento" id="ev2" value="Pranzi / Cene (spazio + cucina)"><label for="ev2">Pranzi / Cene (spazio + cucina)</label></div>
+          <div class="radio-row"><input type="radio" name="tipoEvento" id="ev3" value="Manifestazione / Evento di un'associazione"><label for="ev3">Manifestazione / Evento di un'associazione</label></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Dati anagrafici</legend>
+          <div class="grid2">
+            <label class="field"><span class="lbl">Nome e Cognome <span class="req">*</span></span><input type="text" name="nome" required></label>
+            <label class="field"><span class="lbl">Numero di telefono <span class="req">*</span></span><input type="tel" name="telefono" required></label>
+            <label class="field"><span class="lbl">Indirizzo <span class="req">*</span></span><input type="text" name="indirizzo" required></label>
+            <label class="field"><span class="lbl">CAP e Località <span class="req">*</span></span><input type="text" name="cap" required></label>
+            <label class="field"><span class="lbl">Indirizzo mail <span class="req">*</span></span><input type="email" name="email2" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Regolamento e prezzi</legend>
+          <div class="check-row"><input type="checkbox" id="c1" name="confermaRegolamento" required><label for="c1">Confermo di aver letto il regolamento</label></div>
+          <div class="check-row"><input type="checkbox" id="c2" name="confermaPrezzi" required><label for="c2">Confermo di essere a conoscenza dei prezzi delle sale</label></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Disturbo della quiete pubblica</legend>
+          <div class="check-row"><input type="checkbox" id="c3" name="confermaQuiete" required><label for="c3">Sono stato informato sugli orari da rispettare nell'utilizzo di microfoni o nella diffusione di musica: Oratorio San Giovanni ore 23:00 — Oratorio Santa Maria ore 24:00</label></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Visita degli spazi / consegna chiavi</legend>
+          <p class="hint" style="margin-top:-6px;margin-bottom:10px;">Per la visita degli spazi o la consegna delle chiavi bisognerà contattare direttamente uno dei due responsabili.</p>
+          <div class="check-row"><input type="checkbox" id="r1" name="contattoVisita" value="Rossetto Marco 078 447 83 82"><label for="r1">Rossetto Marco — 078 447 83 82</label></div>
+          <div class="check-row"><input type="checkbox" id="r2" name="contattoVisita" value="Bonsignore Luca 079 681 09 61"><label for="r2">Bonsignore Luca — 079 681 09 61</label></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Ultime conferme</legend>
+          <div class="check-row"><input type="checkbox" id="c4" name="confermaRegolamentoSale" required><label for="c4">Dichiaro di aver letto il regolamento per l'utilizzo delle sale</label></div>
+          <div class="check-row"><input type="checkbox" id="c5" name="confermaOrariPubblico" required><label for="c5">Dichiaro di essere a conoscenza del fatto che il mercoledì, il sabato e la domenica l'Oratorio San Giovanni è aperto al pubblico dalle 14:00 alle 17:00 e che vanno rispettati</label></div>
+        </fieldset>
+
+        <button type="submit" class="btn" id="submitBtn">Invia richiesta di prenotazione</button>
+        <div class="banner ok" id="bannerOk">Richiesta inviata. Riceverai un'email di conferma e ti scriveremo appena sarà esaminata dai responsabili (tel. +41 91 646 88 69, Lu–Ve 9.00–11.30).</div>
+        <div class="banner err" id="bannerErr">Alcuni campi obbligatori non sono stati compilati, oppure c'è stato un problema di connessione. Controlla il modulo e riprova.</div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============ PAGINA 2: CALENDARIO ============ -->
+  <section class="page" id="page-calendario">
+    <div class="sheet">
+      <div class="cal-head">
+        <h2 id="calTitle" class="serif"></h2>
+        <div class="cal-nav">
+          <button id="calPrev">‹ Precedente</button>
+          <button id="calToday">Oggi</button>
+          <button id="calNext">Successivo ›</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--santa-maria)"></span>Oratorio Santa Maria</span>
+        <span><span class="dot" style="background:var(--san-giovanni)"></span>Oratorio San Giovanni</span>
+        <span style="color:var(--ink-soft)">Sono mostrate solo le prenotazioni confermate</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="daylist" id="dayList" style="display:none;">
+        <h3 class="serif" id="dayListTitle"></h3>
+        <div id="dayListBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGINA 3: REPORT (protetta) ============ -->
+  <section class="page" id="page-report">
+    <div class="sheet" id="reportLoginSheet" style="display:none;"></div>
+    <div class="sheet" id="reportContent" style="display:none;">
+      <div class="report-toolbar">
+        <div class="filters">
+          <select id="fSpazio">
+            <option value="">Tutti gli spazi</option>
+            <option value="Oratorio Santa Maria">Oratorio Santa Maria</option>
+            <option value="Oratorio San Giovanni">Oratorio San Giovanni</option>
+          </select>
+          <select id="fStato">
+            <option value="">Tutti gli stati</option>
+            <option value="confirmed">Confermate</option>
+            <option value="pending">In attesa</option>
+            <option value="rejected">Rifiutate</option>
+          </select>
+        </div>
+        <button class="btn ghost" id="exportBtn">Esporta in Excel</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="report" id="reportTable">
+          <thead><tr><th>Data</th><th>Orario</th><th>Spazio</th><th>Evento</th><th>Richiedente</th><th>Telefono</th><th>Email</th><th>Stato</th></tr></thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="reportEmpty" style="display:none;">
+        <span class="serif">Nessuna prenotazione</span>
+        Le richieste inviate dal modulo compariranno qui.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAGINA 4: APPROVAZIONE (protetta) ============ -->
+  <section class="page" id="page-approvazione">
+    <div class="sheet" id="approvLoginSheet" style="display:none;"></div>
+    <div class="sheet" id="approvContent" style="display:none;">
+      <h2 class="serif" style="margin-top:0;font-size:1.3rem;">Richieste in attesa</h2>
+      <div id="approvList"></div>
+      <div class="empty-state" id="approvEmpty" style="display:none;">
+        <span class="serif">Nessuna richiesta in attesa</span>
+        Tutte le prenotazioni sono state esaminate.
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   CONFIGURAZIONE — da compilare (vedi README.md)
+   ============================================================ */
+const SUPABASE_URL = 'https://zihpotynyneenhedmquc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppaHBvdHlueW5lZW5oZWRtcXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyOTY5NDYsImV4cCI6MjEwNDg3Mjk0Nn0.hmQc89dAgml0TbNCX3IFoP0JnZIB-kd25IlMYXRoy2c';
+/* ============================================================ */
+
+(function(){
+  const configOk = !SUPABASE_URL.startsWith('INSERISCI') && !SUPABASE_ANON_KEY.startsWith('INSERISCI');
+  if(!configOk){ document.getElementById('configWarning').style.display='block'; }
+  const sb = configOk ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  function escapeHtml(str){
+    return String(str==null?'':str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtDate(iso){
+    if(!iso) return '—';
+    const [y,m,d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  // ---------- Navigation ----------
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const pages = document.querySelectorAll('section.page');
+  tabs.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      tabs.forEach(b=>b.classList.remove('active'));
+      pages.forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('page-'+btn.dataset.page).classList.add('active');
+      if(btn.dataset.page === 'calendario') renderCalendar();
+      if(btn.dataset.page === 'report') initReport();
+      if(btn.dataset.page === 'approvazione') initApprovazione();
+    });
+  });
+
+  // ---------- Room picker visual state ----------
+  document.querySelectorAll('.room-opt').forEach(opt=>{
+    const input = opt.querySelector('input');
+    input.addEventListener('change', ()=>{
+      document.querySelectorAll('.room-opt').forEach(o=>o.classList.remove('sel'));
+      opt.classList.add('sel');
+    });
+  });
+
+  // ---------- Form submit (Prenota) ----------
+  const form = document.getElementById('bookingForm');
+  const bannerOk = document.getElementById('bannerOk');
+  const bannerErr = document.getElementById('bannerErr');
+  const submitBtn = document.getElementById('submitBtn');
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    bannerOk.style.display='none';
+    bannerErr.style.display='none';
+
+    if(!form.checkValidity()){
+      form.reportValidity();
+      bannerErr.style.display='block';
+      return;
+    }
+    if(!sb){ bannerErr.style.display='block'; return; }
+
+    const fd = new FormData(form);
+    const contatti = fd.getAll('contattoVisita');
+
+    const record = {
+      email: fd.get('email'),
+      email2: fd.get('email2'),
+      spazio: fd.get('spazio'),
+      data: fd.get('data'),
+      orario: fd.get('orario'),
+      tipo_evento: fd.get('tipoEvento'),
+      nome: fd.get('nome'),
+      indirizzo: fd.get('indirizzo'),
+      cap: fd.get('cap'),
+      telefono: fd.get('telefono'),
+      contatto_visita: contatti.join(' / '),
+      conferma_regolamento: fd.get('confermaRegolamento')==='on',
+      conferma_prezzi: fd.get('confermaPrezzi')==='on',
+      conferma_quiete: fd.get('confermaQuiete')==='on',
+      conferma_regolamento_sale: fd.get('confermaRegolamentoSale')==='on',
+      conferma_orari_pubblico: fd.get('confermaOrariPubblico')==='on',
+      status: 'pending'
+    };
+
+    submitBtn.disabled = true;
+    const { error } = await sb.from('prenotazioni').insert([record]);
+    submitBtn.disabled = false;
+
+    if(error){
+      console.error(error);
+      bannerErr.style.display='block';
+      return;
+    }
+
+    form.reset();
+    document.querySelectorAll('.room-opt').forEach(o=>o.classList.remove('sel'));
+    bannerOk.style.display='block';
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+
+  // ---------- Calendar (pubblico, solo confermate) ----------
+  let calCursor = new Date(); calCursor.setDate(1);
+  const MONTHS = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const DOWS = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+
+  function isoOf(d){
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  async function renderCalendar(){
+    document.getElementById('calTitle').textContent = `${MONTHS[calCursor.getMonth()]} ${calCursor.getFullYear()}`;
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    DOWS.forEach(d=>{ const el=document.createElement('div'); el.className='cal-dow'; el.textContent=d; grid.appendChild(el); });
+
+    let list = [];
+    if(sb){
+      const start = isoOf(new Date(calCursor.getFullYear(), calCursor.getMonth()-1, 1));
+      const end = isoOf(new Date(calCursor.getFullYear(), calCursor.getMonth()+2, 0));
+      const { data, error } = await sb.from('prenotazioni').select('*').eq('status','confirmed').gte('data', start).lte('data', end);
+      if(!error) list = data || [];
+    }
+
+    const firstOfMonth = new Date(calCursor.getFullYear(), calCursor.getMonth(), 1);
+    let startOffset = firstOfMonth.getDay() - 1;
+    if(startOffset < 0) startOffset = 6;
+    const gridStart = new Date(firstOfMonth);
+    gridStart.setDate(gridStart.getDate() - startOffset);
+
+    const byDate = {};
+    list.forEach(b=>{ (byDate[b.data] = byDate[b.data]||[]).push(b); });
+
+    for(let i=0;i<42;i++){
+      const cellDate = new Date(gridStart); cellDate.setDate(gridStart.getDate()+i);
+      const iso = isoOf(cellDate);
+      const cell = document.createElement('div');
+      cell.className = 'cal-cell' + (cellDate.getMonth()!==calCursor.getMonth() ? ' out' : '');
+      const num = document.createElement('div'); num.className='num'; num.textContent = cellDate.getDate();
+      cell.appendChild(num);
+      (byDate[iso]||[]).forEach(b=>{
+        const chip = document.createElement('span');
+        chip.className = 'chip ' + (b.spazio.includes('Giovanni') ? 'sg' : 'sm');
+        chip.textContent = (b.orario||'') + ' ' + b.nome;
+        chip.addEventListener('click', ()=>showDayList(iso, byDate[iso]));
+        cell.appendChild(chip);
+      });
+      if((byDate[iso]||[]).length){
+        cell.style.cursor='pointer';
+        cell.addEventListener('click', (ev)=>{ if(ev.target===cell||ev.target===num) showDayList(iso, byDate[iso]); });
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  function showDayList(iso, bookings){
+    const wrap = document.getElementById('dayList');
+    wrap.style.display='block';
+    document.getElementById('dayListTitle').textContent = `Prenotazioni confermate — ${fmtDate(iso)}`;
+    const body = document.getElementById('dayListBody');
+    body.innerHTML = '';
+    bookings.forEach(b=>{
+      const row = document.createElement('div');
+      row.className='booking-row';
+      row.innerHTML = `<div><strong>${b.orario||'—'} · ${escapeHtml(b.spazio)}</strong>
+        <div class="meta">${escapeHtml(b.nome)} · ${escapeHtml(b.tipo_evento||'')}</div></div>
+        <span class="status-tag confirmed">Confermata</span>`;
+      body.appendChild(row);
+    });
+  }
+
+  document.getElementById('calPrev').addEventListener('click', ()=>{ calCursor.setMonth(calCursor.getMonth()-1); renderCalendar(); });
+  document.getElementById('calNext').addEventListener('click', ()=>{ calCursor.setMonth(calCursor.getMonth()+1); renderCalendar(); });
+  document.getElementById('calToday').addEventListener('click', ()=>{ calCursor = new Date(); calCursor.setDate(1); renderCalendar(); });
+
+  // ---------- Auth (Report / Approvazione) ----------
+  let currentSession = null;
+
+  function loginFormHtml(actionId){
+    return `
+      <div class="login-box">
+        <h2 class="serif" style="margin-top:0;">Accesso responsabili</h2>
+        <p class="hint">Questa sezione è riservata ai responsabili della Casa della Gioventù.</p>
+        <label class="field"><span class="lbl">Email</span><input type="email" id="${actionId}-email"></label>
+        <label class="field"><span class="lbl">Password</span><input type="password" id="${actionId}-password"></label>
+        <button class="btn" id="${actionId}-submit" style="width:100%;">Accedi</button>
+        <div class="banner err" id="${actionId}-err" style="text-align:left;"></div>
+      </div>`;
+  }
+
+  async function doLogin(prefix){
+    const email = document.getElementById(prefix+'-email').value.trim();
+    const password = document.getElementById(prefix+'-password').value;
+    const errBox = document.getElementById(prefix+'-err');
+    errBox.style.display='none';
+    if(!sb){ return; }
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){
+      errBox.textContent = 'Accesso non riuscito: email o password non corrette.';
+      errBox.style.display='block';
+      return;
+    }
+    refreshAuthUI();
+  }
+
+  function renderWho(){
+    const box = document.getElementById('whoBox');
+    if(currentSession){
+      box.innerHTML = `<span>${escapeHtml(currentSession.user.email)}</span><button id="logoutBtn">Esci</button>`;
+      document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+        await sb.auth.signOut();
+        refreshAuthUI();
+      });
+    } else {
+      box.innerHTML = '';
+    }
+  }
+
+  async function refreshAuthUI(){
+    if(sb){
+      const { data } = await sb.auth.getSession();
+      currentSession = data.session;
+    }
+    renderWho();
+    if(document.getElementById('page-report').classList.contains('active')) initReport();
+    if(document.getElementById('page-approvazione').classList.contains('active')) initApprovazione();
+  }
+
+  // ---------- Report ----------
+  async function initReport(){
+    const loginSheet = document.getElementById('reportLoginSheet');
+    const content = document.getElementById('reportContent');
+    if(!currentSession){
+      loginSheet.style.display='block'; content.style.display='none';
+      loginSheet.innerHTML = loginFormHtml('report');
+      document.getElementById('report-submit').addEventListener('click', ()=>doLogin('report'));
+      return;
+    }
+    loginSheet.style.display='none'; content.style.display='block';
+    renderReport();
+  }
+
+  document.getElementById('fSpazio').addEventListener('change', renderReport);
+  document.getElementById('fStato').addEventListener('change', renderReport);
+
+  async function fetchAllBookings(){
+    if(!sb || !currentSession) return [];
+    const { data, error } = await sb.from('prenotazioni').select('*').order('data', { ascending:true });
+    if(error){ console.error(error); return []; }
+    return data || [];
+  }
+
+  async function renderReport(){
+    let list = await fetchAllBookings();
+    const fSpazio = document.getElementById('fSpazio').value;
+    const fStato = document.getElementById('fStato').value;
+    if(fSpazio) list = list.filter(b=>b.spazio===fSpazio);
+    if(fStato) list = list.filter(b=>b.status===fStato);
+
+    const body = document.getElementById('reportBody');
+    const empty = document.getElementById('reportEmpty');
+    body.innerHTML = '';
+    if(list.length===0){ empty.style.display='block'; return; }
+    empty.style.display='none';
+
+    const statusLabel = { confirmed:'Confermata', pending:'In attesa', rejected:'Rifiutata' };
+    list.forEach(b=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${fmtDate(b.data)}</td><td>${escapeHtml(b.orario)}</td><td>${escapeHtml(b.spazio)}</td>
+        <td>${escapeHtml(b.tipo_evento)}</td><td>${escapeHtml(b.nome)}</td><td>${escapeHtml(b.telefono)}</td>
+        <td>${escapeHtml(b.email)}</td>
+        <td><span class="status-tag ${b.status}">${statusLabel[b.status]||b.status}</span></td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', async ()=>{
+    const list = await fetchAllBookings();
+    if(!list.length){ alert('Nessuna prenotazione da esportare.'); return; }
+    const statusLabel = { confirmed:'Confermata', pending:'In attesa', rejected:'Rifiutata' };
+    const rows = list.map(b=>({
+      'Data': b.data, 'Orario': b.orario, 'Spazio': b.spazio, 'Evento': b.tipo_evento,
+      'Nome e Cognome': b.nome, 'Indirizzo': b.indirizzo, 'CAP e Località': b.cap,
+      'Telefono': b.telefono, 'Email': b.email, 'Email (dati anagrafici)': b.email2,
+      'Referente visita/chiavi': b.contatto_visita, 'Stato': statusLabel[b.status]||b.status,
+      'Nota rifiuto': b.nota_rifiuto||'', 'Inviata il': b.created_at
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:11},{wch:8},{wch:22},{wch:28},{wch:20},{wch:22},{wch:16},{wch:14},{wch:24},{wch:24},{wch:30},{wch:12},{wch:24},{wch:20}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Prenotazioni');
+    XLSX.writeFile(wb, 'prenotazioni_sale_oratori.xlsx');
+  });
+
+  // ---------- Approvazione ----------
+  async function initApprovazione(){
+    const loginSheet = document.getElementById('approvLoginSheet');
+    const content = document.getElementById('approvContent');
+    if(!currentSession){
+      loginSheet.style.display='block'; content.style.display='none';
+      loginSheet.innerHTML = loginFormHtml('approv');
+      document.getElementById('approv-submit').addEventListener('click', ()=>doLogin('approv'));
+      return;
+    }
+    loginSheet.style.display='none'; content.style.display='block';
+    renderApprovazione();
+  }
+
+  async function renderApprovazione(){
+    if(!sb || !currentSession) return;
+    const { data, error } = await sb.from('prenotazioni').select('*').eq('status','pending').order('data', { ascending:true });
+    const listEl = document.getElementById('approvList');
+    const emptyEl = document.getElementById('approvEmpty');
+    listEl.innerHTML = '';
+    if(error){ console.error(error); return; }
+    if(!data || data.length===0){ emptyEl.style.display='block'; return; }
+    emptyEl.style.display='none';
+
+    data.forEach(b=>{
+      const card = document.createElement('div');
+      card.className='approval-card';
+      card.innerHTML = `
+        <div class="top-row">
+          <div>
+            <strong>${escapeHtml(b.nome)}</strong> — ${escapeHtml(b.spazio)}
+            <div class="meta" style="color:var(--ink-soft);font-size:0.85rem;">${fmtDate(b.data)} · ${escapeHtml(b.orario)} · ${escapeHtml(b.tipo_evento)}</div>
+          </div>
+          <span class="status-tag pending">In attesa</span>
+        </div>
+        <dl>
+          <dt>Telefono</dt><dd>${escapeHtml(b.telefono)}</dd>
+          <dt>Email</dt><dd>${escapeHtml(b.email)}</dd>
+          <dt>Indirizzo</dt><dd>${escapeHtml(b.indirizzo)}, ${escapeHtml(b.cap)}</dd>
+          <dt>Referente chiavi</dt><dd>${escapeHtml(b.contatto_visita||'—')}</dd>
+        </dl>
+        <div class="actions">
+          <button class="btn sage small" data-action="approve" data-id="${b.id}">Approva</button>
+          <button class="btn ghost small" data-action="reject" data-id="${b.id}">Rifiuta</button>
+        </div>`;
+      listEl.appendChild(card);
+    });
+
+    listEl.querySelectorAll('button[data-action]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.id;
+        if(btn.dataset.action === 'approve'){
+          btn.disabled = true;
+          const { error } = await sb.from('prenotazioni').update({ status:'confirmed' }).eq('id', id);
+          if(error) console.error(error);
+          renderApprovazione();
+        } else {
+          const nota = prompt('Motivazione del rifiuto (facoltativa):') || '';
+          const { error } = await sb.from('prenotazioni').update({ status:'rejected', nota_rifiuto: nota }).eq('id', id);
+          if(error) console.error(error);
+          renderApprovazione();
+        }
+      });
+    });
+  }
+
+  // ---------- Init ----------
+  if(sb){
+    sb.auth.onAuthStateChange((_event, session)=>{
+      currentSession = session;
+      renderWho();
+    });
+    refreshAuthUI();
+  }
+})();
+</script>
+</body>
+</html>
