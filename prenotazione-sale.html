@@ -133,6 +133,12 @@
   .approval-card dt{color:var(--ink-soft);}
   .approval-card dd{margin:0;}
   .approval-card .actions{display:flex;gap:10px;margin-top:14px;}
+  .badge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:10px;background:var(--burgundy);color:#fff;font-family:'Source Sans 3',sans-serif;font-size:0.72rem;font-weight:700;line-height:1.4;text-align:center;vertical-align:middle;}
+  a.btn{display:inline-block;text-decoration:none;}
+  .esito-panel{background:#EAF1E6;border:1px solid var(--sage);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;font-size:0.92rem;color:var(--ink);}
+  .esito-panel p{margin:0 0 12px;}
+  .esito-panel .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .esito-panel .hint{margin-top:10px;}
   .config-warning{background:#FBF0DC;border:1px solid var(--gold);color:#6b5115;padding:14px 16px;border-radius:var(--radius);font-size:0.9rem;margin-bottom:20px;}
 </style>
 </head>
@@ -151,7 +157,7 @@
       <button data-page="prenota" class="active">Prenota</button>
       <button data-page="calendario">Calendario</button>
       <button data-page="report">Report <span class="lock">🔒</span></button>
-      <button data-page="approvazione">Approvazione <span class="lock">🔒</span></button>
+      <button data-page="approvazione">Approvazione <span class="lock">🔒</span><span class="badge" id="pendingBadge" style="display:none;"></span></button>
     </nav>
   </header>
 
@@ -239,7 +245,7 @@
         </fieldset>
 
         <button type="submit" class="btn" id="submitBtn">Invia richiesta di prenotazione</button>
-        <div class="banner ok" id="bannerOk">Richiesta inviata. Riceverai un'email di conferma e ti scriveremo appena sarà esaminata dai responsabili (tel. +41 91 646 88 69, Lu–Ve 9.00–11.30).</div>
+        <div class="banner ok" id="bannerOk">Richiesta inviata. I responsabili la esamineranno e ti scriveremo all'indirizzo email indicato con l'esito. Per informazioni: tel. +41 91 646 88 69, Lu–Ve 9.00–11.30.</div>
         <div class="banner err" id="bannerErr">Alcuni campi obbligatori non sono stati compilati, oppure c'è stato un problema di connessione. Controlla il modulo e riprova.</div>
       </form>
     </div>
@@ -291,7 +297,7 @@
       </div>
       <div style="overflow-x:auto;">
         <table class="report" id="reportTable">
-          <thead><tr><th>Data</th><th>Orario</th><th>Spazio</th><th>Evento</th><th>Richiedente</th><th>Telefono</th><th>Email</th><th>Stato</th></tr></thead>
+          <thead><tr><th>Data</th><th>Orario</th><th>Spazio</th><th>Evento</th><th>Richiedente</th><th>Telefono</th><th>Email</th><th>Stato</th><th>Esito</th></tr></thead>
           <tbody id="reportBody"></tbody>
         </table>
       </div>
@@ -306,6 +312,7 @@
   <section class="page" id="page-approvazione">
     <div class="sheet" id="approvLoginSheet" style="display:none;"></div>
     <div class="sheet" id="approvContent" style="display:none;">
+      <div id="esitoPanel"></div>
       <h2 class="serif" style="margin-top:0;font-size:1.3rem;">Richieste in attesa</h2>
       <div id="approvList"></div>
       <div class="empty-state" id="approvEmpty" style="display:none;">
@@ -323,6 +330,11 @@
    ============================================================ */
 const SUPABASE_URL = 'https://zihpotynyneenhedmquc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppaHBvdHlueW5lZW5oZWRtcXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyOTY5NDYsImV4cCI6MjEwNDg3Mjk0Nn0.hmQc89dAgml0TbNCX3IFoP0JnZIB-kd25IlMYXRoy2c';
+
+// Account Gmail da cui i responsabili inviano l'email di esito (es. 'prenotazioni.oratori@gmail.com').
+// Serve a far aprire Gmail direttamente sull'account giusto. Se lasci vuoto, Gmail usa
+// l'account attualmente collegato nel browser.
+const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
 /* ============================================================ */
 
 (function(){
@@ -337,6 +349,83 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     if(!iso) return '—';
     const [y,m,d] = iso.split('-');
     return `${d}/${m}/${y}`;
+  }
+
+  // ---------- Email di esito (si invia a mano da Gmail) ----------
+  function esitoEmail(b){
+    const data = fmtDate(b.data);
+    const firma = 'Cordiali saluti\nCasa della Gioventù — Parrocchia di Mendrisio';
+    const segreteria = 'Per qualsiasi informazione: segretariato +41 91 646 88 69 (Lu–Ve 9.00–11.30).';
+    let subject, body;
+    if(b.status === 'confirmed'){
+      subject = `Prenotazione confermata — ${b.spazio}, ${data}`;
+      body = `Gentile ${b.nome},\n\n`
+        + `la Sua richiesta per ${b.spazio} del ${data} alle ${b.orario} (${b.tipo_evento}) è stata CONFERMATA.\n\n`
+        + `Per la visita degli spazi e la consegna delle chiavi può contattare direttamente: ${b.contatto_visita || 'uno dei responsabili'}.\n`
+        + `Il contributo d'affitto va versato secondo le indicazioni della Casa della Gioventù e del regolamento.\n\n`
+        + `${segreteria}\n\n${firma}`;
+    } else {
+      subject = `Richiesta di prenotazione non accolta — ${b.spazio}, ${data}`;
+      body = `Gentile ${b.nome},\n\n`
+        + `purtroppo non possiamo accogliere la Sua richiesta per ${b.spazio} del ${data} alle ${b.orario} (${b.tipo_evento}).\n`
+        + (b.nota_rifiuto ? `\nMotivazione: ${b.nota_rifiuto}\n` : '')
+        + `\n${segreteria}\n\n${firma}`;
+    }
+    return { to: b.email || b.email2, subject, body };
+  }
+
+  function gmailLink(m){
+    const q = [
+      'view=cm', 'fs=1',
+      'to=' + encodeURIComponent(m.to),
+      'su=' + encodeURIComponent(m.subject),
+      'body=' + encodeURIComponent(m.body)
+    ];
+    if(GMAIL_ACCOUNT) q.push('authuser=' + encodeURIComponent(GMAIL_ACCOUNT));
+    return 'https://mail.google.com/mail/?' + q.join('&');
+  }
+
+  async function copyText(text){
+    try{ await navigator.clipboard.writeText(text); return true; }
+    catch(e){
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try{ ok = document.execCommand('copy'); }catch(_){ }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function showEsitoPanel(b){
+    const panel = document.getElementById('esitoPanel');
+    const m = esitoEmail(b);
+    const verbo = b.status === 'confirmed' ? 'approvata' : 'rifiutata';
+    panel.innerHTML = `
+      <div class="esito-panel">
+        <p><strong>Richiesta di ${escapeHtml(b.nome)} ${verbo}.</strong> Ora puoi inviare l'esito al richiedente (${escapeHtml(m.to)}).</p>
+        <div class="actions">
+          <a class="btn sage small" target="_blank" rel="noopener" href="${escapeHtml(gmailLink(m))}">✉ Apri Gmail con il messaggio pronto</a>
+          <button class="btn ghost small" id="esitoCopy" type="button">Copia testo</button>
+          <button class="btn ghost small" id="esitoClose" type="button">Chiudi</button>
+        </div>
+        <div class="hint">Si apre la schermata di scrittura di Gmail: controlla il testo, aggiungi quello che serve e premi Invio. Puoi anche riaprire il messaggio più tardi dalla scheda Report (colonna Esito).</div>
+      </div>`;
+    document.getElementById('esitoCopy').addEventListener('click', async (ev)=>{
+      const ok = await copyText(`A: ${m.to}\nOggetto: ${m.subject}\n\n${m.body}`);
+      ev.target.textContent = ok ? 'Copiato ✓' : 'Copia non riuscita';
+    });
+    document.getElementById('esitoClose').addEventListener('click', ()=>{ panel.innerHTML = ''; });
+  }
+
+  // ---------- Contatore richieste in attesa (solo responsabili) ----------
+  async function updatePendingBadge(){
+    const badge = document.getElementById('pendingBadge');
+    if(!sb || !currentSession){ badge.style.display = 'none'; return; }
+    const { count, error } = await sb.from('prenotazioni').select('id', { count:'exact', head:true }).eq('status','pending');
+    if(error || !count){ badge.style.display = 'none'; return; }
+    badge.textContent = count;
+    badge.style.display = 'inline-block';
   }
 
   // ---------- Navigation ----------
@@ -405,13 +494,20 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     };
 
     submitBtn.disabled = true;
-    const { error } = await sb.from('prenotazioni').insert([record]);
+    const { data: inserted, error } = await sb.from('prenotazioni').insert([record]).select();
     submitBtn.disabled = false;
 
     if(error){
       console.error(error);
       bannerErr.style.display='block';
       return;
+    }
+
+    // Avvisa i responsabili via email di una nuova richiesta, chiamando
+    // direttamente la funzione (senza passare dai Database Webhooks)
+    if(inserted && inserted[0]){
+      sb.functions.invoke('notify', { body: { type:'INSERT', table:'prenotazioni', record: inserted[0] } })
+        .catch(e=>console.error('Invio email fallito:', e));
     }
 
     form.reset();
@@ -544,6 +640,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       currentSession = data.session;
     }
     renderWho();
+    updatePendingBadge();
     if(document.getElementById('page-report').classList.contains('active')) initReport();
     if(document.getElementById('page-approvazione').classList.contains('active')) initApprovazione();
   }
@@ -592,7 +689,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
         <td>${fmtDate(b.data)}</td><td>${escapeHtml(b.orario)}</td><td>${escapeHtml(b.spazio)}</td>
         <td>${escapeHtml(b.tipo_evento)}</td><td>${escapeHtml(b.nome)}</td><td>${escapeHtml(b.telefono)}</td>
         <td>${escapeHtml(b.email)}</td>
-        <td><span class="status-tag ${b.status}">${statusLabel[b.status]||b.status}</span></td>`;
+        <td><span class="status-tag ${b.status}">${statusLabel[b.status]||b.status}</span></td>
+        <td>${b.status !== 'pending'
+          ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${escapeHtml(gmailLink(esitoEmail(b)))}">✉ Invia esito</a>`
+          : ''}</td>`;
       body.appendChild(tr);
     });
   }
@@ -666,17 +766,30 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     listEl.querySelectorAll('button[data-action]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.id;
+        let patch;
         if(btn.dataset.action === 'approve'){
-          btn.disabled = true;
-          const { error } = await sb.from('prenotazioni').update({ status:'confirmed' }).eq('id', id);
-          if(error) console.error(error);
-          renderApprovazione();
+          patch = { status:'confirmed' };
         } else {
-          const nota = prompt('Motivazione del rifiuto (facoltativa):') || '';
-          const { error } = await sb.from('prenotazioni').update({ status:'rejected', nota_rifiuto: nota }).eq('id', id);
-          if(error) console.error(error);
-          renderApprovazione();
+          const nota = prompt('Motivazione del rifiuto (facoltativa):');
+          if(nota === null) return; // Annulla: nessuna modifica
+          patch = { status:'rejected', nota_rifiuto: nota };
         }
+        btn.disabled = true;
+        const { data: updated, error } = await sb.from('prenotazioni').update(patch).eq('id', id).select();
+        if(error){
+          console.error(error);
+          btn.disabled = false;
+          alert('Operazione non riuscita. Riprova.');
+          return;
+        }
+        if(!updated || !updated.length){
+          btn.disabled = false;
+          alert('Modifica non consentita: verifica che il tuo indirizzo sia tra i responsabili autorizzati.');
+          return;
+        }
+        showEsitoPanel(updated[0]);
+        renderApprovazione();
+        updatePendingBadge();
       });
     });
   }
