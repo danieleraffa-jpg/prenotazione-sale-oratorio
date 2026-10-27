@@ -494,20 +494,13 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
     };
 
     submitBtn.disabled = true;
-    const { data: inserted, error } = await sb.from('prenotazioni').insert([record]).select();
+    const { error } = await sb.from('prenotazioni').insert([record]);
     submitBtn.disabled = false;
 
     if(error){
       console.error(error);
       bannerErr.style.display='block';
       return;
-    }
-
-    // Avvisa i responsabili via email di una nuova richiesta, chiamando
-    // direttamente la funzione (senza passare dai Database Webhooks)
-    if(inserted && inserted[0]){
-      sb.functions.invoke('notify', { body: { type:'INSERT', table:'prenotazioni', record: inserted[0] } })
-        .catch(e=>console.error('Invio email fallito:', e));
     }
 
     form.reset();
