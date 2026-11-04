@@ -328,7 +328,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 (function(){
   const configOk = !SUPABASE_URL.startsWith('INSERISCI') && !SUPABASE_ANON_KEY.startsWith('INSERISCI');
   if(!configOk){ document.getElementById('configWarning').style.display='block'; }
-  const sb = configOk ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  // La sessione di login vive solo finché il browser resta aperto (sessionStorage)
+  const sb = configOk ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { storage: window.sessionStorage }
+  }) : null;
 
   function escapeHtml(str){
     return String(str==null?'':str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
