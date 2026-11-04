@@ -111,6 +111,9 @@
   .status-tag.confirmed{background:#EAF1E6;color:var(--sage-dark);}
   .status-tag.pending{background:#FBF0DC;color:var(--gold);}
   .status-tag.rejected{background:#F7E9E3;color:var(--burgundy-dark);}
+  .status-tag.cancelled{background:#ECE8DD;color:var(--ink-soft);text-decoration:line-through;}
+  td.azioni{white-space:nowrap;}
+  td.azioni .btn + .btn{margin-left:6px;}
 
   /* Report / Approvazione */
   .report-toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px;}
@@ -133,6 +136,12 @@
   .approval-card dt{color:var(--ink-soft);}
   .approval-card dd{margin:0;}
   .approval-card .actions{display:flex;gap:10px;margin-top:14px;}
+  .badge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:10px;background:var(--burgundy);color:#fff;font-family:'Source Sans 3',sans-serif;font-size:0.72rem;font-weight:700;line-height:1.4;text-align:center;vertical-align:middle;}
+  a.btn{display:inline-block;text-decoration:none;}
+  .esito-panel{background:#EAF1E6;border:1px solid var(--sage);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;font-size:0.92rem;color:var(--ink);}
+  .esito-panel p{margin:0 0 12px;}
+  .esito-panel .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .esito-panel .hint{margin-top:10px;}
   .config-warning{background:#FBF0DC;border:1px solid var(--gold);color:#6b5115;padding:14px 16px;border-radius:var(--radius);font-size:0.9rem;margin-bottom:20px;}
 </style>
 </head>
@@ -151,7 +160,7 @@
       <button data-page="prenota" class="active">Prenota</button>
       <button data-page="calendario">Calendario</button>
       <button data-page="report">Report <span class="lock">🔒</span></button>
-      <button data-page="approvazione">Approvazione <span class="lock">🔒</span></button>
+      <button data-page="approvazione">Approvazione <span class="lock">🔒</span><span class="badge" id="pendingBadge" style="display:none;"></span></button>
     </nav>
   </header>
 
@@ -239,7 +248,7 @@
         </fieldset>
 
         <button type="submit" class="btn" id="submitBtn">Invia richiesta di prenotazione</button>
-        <div class="banner ok" id="bannerOk">Richiesta inviata. Riceverai un'email di conferma e ti scriveremo appena sarà esaminata dai responsabili (tel. +41 91 646 88 69, Lu–Ve 9.00–11.30).</div>
+        <div class="banner ok" id="bannerOk">Richiesta inviata. I responsabili la esamineranno e ti scriveremo all'indirizzo email indicato con l'esito. Per informazioni: tel. +41 91 646 88 69, Lu–Ve 9.00–11.30.</div>
         <div class="banner err" id="bannerErr">Alcuni campi obbligatori non sono stati compilati, oppure c'è stato un problema di connessione. Controlla il modulo e riprova.</div>
       </form>
     </div>
@@ -285,13 +294,15 @@
             <option value="confirmed">Confermate</option>
             <option value="pending">In attesa</option>
             <option value="rejected">Rifiutate</option>
+            <option value="cancelled">Annullate</option>
           </select>
         </div>
         <button class="btn ghost" id="exportBtn">Esporta in Excel</button>
       </div>
+      <div id="reportEsitoPanel"></div>
       <div style="overflow-x:auto;">
         <table class="report" id="reportTable">
-          <thead><tr><th>Data</th><th>Orario</th><th>Spazio</th><th>Evento</th><th>Richiedente</th><th>Telefono</th><th>Email</th><th>Stato</th></tr></thead>
+          <thead><tr><th>Data</th><th>Orario</th><th>Spazio</th><th>Evento</th><th>Richiedente</th><th>Telefono</th><th>Email</th><th>Stato</th><th>Azioni</th></tr></thead>
           <tbody id="reportBody"></tbody>
         </table>
       </div>
@@ -306,6 +317,7 @@
   <section class="page" id="page-approvazione">
     <div class="sheet" id="approvLoginSheet" style="display:none;"></div>
     <div class="sheet" id="approvContent" style="display:none;">
+      <div id="esitoPanel"></div>
       <h2 class="serif" style="margin-top:0;font-size:1.3rem;">Richieste in attesa</h2>
       <div id="approvList"></div>
       <div class="empty-state" id="approvEmpty" style="display:none;">
@@ -323,12 +335,17 @@
    ============================================================ */
 const SUPABASE_URL = 'https://zihpotynyneenhedmquc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InppaHBvdHlueW5lZW5oZWRtcXVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyOTY5NDYsImV4cCI6MjEwNDg3Mjk0Nn0.hmQc89dAgml0TbNCX3IFoP0JnZIB-kd25IlMYXRoy2c';
+
+// Account Gmail da cui i responsabili inviano l'email di esito (es. 'prenotazioni.oratori@gmail.com').
+// Serve a far aprire Gmail direttamente sull'account giusto. Se lasci vuoto, Gmail usa
+// l'account attualmente collegato nel browser.
+const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
 /* ============================================================ */
 
 (function(){
   const configOk = !SUPABASE_URL.startsWith('INSERISCI') && !SUPABASE_ANON_KEY.startsWith('INSERISCI');
   if(!configOk){ document.getElementById('configWarning').style.display='block'; }
-  // La sessione di login vive solo finché il browser resta aperto (sessionStorage)
+  // La sessione di login vive solo finché la scheda del browser resta aperta (sessionStorage)
   const sb = configOk ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { storage: window.sessionStorage }
   }) : null;
@@ -340,6 +357,92 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     if(!iso) return '—';
     const [y,m,d] = iso.split('-');
     return `${d}/${m}/${y}`;
+  }
+
+  const STATUS_LABEL = { confirmed:'Confermata', pending:'In attesa', rejected:'Rifiutata', cancelled:'Annullata' };
+
+  // ---------- Email di esito (si invia a mano da Gmail) ----------
+  function esitoEmail(b){
+    const data = fmtDate(b.data);
+    const firma = 'Cordiali saluti\nCasa della Gioventù — Parrocchia di Mendrisio';
+    const segreteria = 'Per qualsiasi informazione: segretariato +41 91 646 88 69 (Lu–Ve 9.00–11.30).';
+    let subject, body;
+    if(b.status === 'confirmed'){
+      subject = `Prenotazione confermata — ${b.spazio}, ${data}`;
+      body = `Gentile ${b.nome},\n\n`
+        + `la Sua richiesta per ${b.spazio} del ${data} alle ${b.orario} (${b.tipo_evento}) è stata CONFERMATA.\n\n`
+        + `Per la visita degli spazi e la consegna delle chiavi può contattare direttamente: ${b.contatto_visita || 'uno dei responsabili'}.\n`
+        + `Il contributo d'affitto va versato secondo le indicazioni della Casa della Gioventù e del regolamento.\n\n`
+        + `${segreteria}\n\n${firma}`;
+    } else if(b.status === 'cancelled'){
+      subject = `Prenotazione annullata — ${b.spazio}, ${data}`;
+      body = `Gentile ${b.nome},\n\n`
+        + `confermiamo che la prenotazione per ${b.spazio} del ${data} alle ${b.orario} (${b.tipo_evento}) è stata ANNULLATA.\n`
+        + (b.nota_rifiuto ? `\nNota: ${b.nota_rifiuto}\n` : '')
+        + `\n${segreteria}\n\n${firma}`;
+    } else {
+      subject = `Richiesta di prenotazione non accolta — ${b.spazio}, ${data}`;
+      body = `Gentile ${b.nome},\n\n`
+        + `purtroppo non possiamo accogliere la Sua richiesta per ${b.spazio} del ${data} alle ${b.orario} (${b.tipo_evento}).\n`
+        + (b.nota_rifiuto ? `\nMotivazione: ${b.nota_rifiuto}\n` : '')
+        + `\n${segreteria}\n\n${firma}`;
+    }
+    return { to: b.email || b.email2, subject, body };
+  }
+
+  function gmailLink(m){
+    const q = [
+      'view=cm', 'fs=1',
+      'to=' + encodeURIComponent(m.to),
+      'su=' + encodeURIComponent(m.subject),
+      'body=' + encodeURIComponent(m.body)
+    ];
+    if(GMAIL_ACCOUNT) q.push('authuser=' + encodeURIComponent(GMAIL_ACCOUNT));
+    return 'https://mail.google.com/mail/?' + q.join('&');
+  }
+
+  async function copyText(text){
+    try{ await navigator.clipboard.writeText(text); return true; }
+    catch(e){
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try{ ok = document.execCommand('copy'); }catch(_){ }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function showEsitoPanel(b, panelId){
+    const panel = document.getElementById(panelId || 'esitoPanel');
+    const m = esitoEmail(b);
+    const verbo = { confirmed:'approvata', rejected:'rifiutata', cancelled:'annullata' }[b.status] || 'aggiornata';
+    panel.innerHTML = `
+      <div class="esito-panel">
+        <p><strong>Richiesta di ${escapeHtml(b.nome)} ${verbo}.</strong> Ora puoi inviare l'esito al richiedente (${escapeHtml(m.to)}).</p>
+        <div class="actions">
+          <a class="btn sage small" target="_blank" rel="noopener" href="${escapeHtml(gmailLink(m))}">✉ Apri Gmail con il messaggio pronto</a>
+          <button class="btn ghost small esito-copy" type="button">Copia testo</button>
+          <button class="btn ghost small esito-close" type="button">Chiudi</button>
+        </div>
+        <div class="hint">Si apre la schermata di scrittura di Gmail: controlla il testo, aggiungi quello che serve e premi Invio. Puoi anche riaprire il messaggio più tardi dalla scheda Report (colonna Azioni).</div>
+      </div>`;
+    panel.querySelector('.esito-copy').addEventListener('click', async (ev)=>{
+      const ok = await copyText(`A: ${m.to}\nOggetto: ${m.subject}\n\n${m.body}`);
+      ev.target.textContent = ok ? 'Copiato ✓' : 'Copia non riuscita';
+    });
+    panel.querySelector('.esito-close').addEventListener('click', ()=>{ panel.innerHTML = ''; });
+    panel.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  // ---------- Contatore richieste in attesa (solo responsabili) ----------
+  async function updatePendingBadge(){
+    const badge = document.getElementById('pendingBadge');
+    if(!sb || !currentSession){ badge.style.display = 'none'; return; }
+    const { count, error } = await sb.from('prenotazioni').select('id', { count:'exact', head:true }).eq('status','pending');
+    if(error || !count){ badge.style.display = 'none'; return; }
+    badge.textContent = count;
+    badge.style.display = 'inline-block';
   }
 
   // ---------- Navigation ----------
@@ -408,20 +511,13 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     };
 
     submitBtn.disabled = true;
-    const { data: inserted, error } = await sb.from('prenotazioni').insert([record]).select();
+    const { error } = await sb.from('prenotazioni').insert([record]);
     submitBtn.disabled = false;
 
     if(error){
       console.error(error);
       bannerErr.style.display='block';
       return;
-    }
-
-    // Invia le notifiche via email chiamando direttamente la funzione,
-    // senza passare dai Database Webhooks
-    if(inserted && inserted[0]){
-      sb.functions.invoke('notify', { body: { type:'INSERT', table:'prenotazioni', record: inserted[0] } })
-        .catch(e=>console.error('Invio email fallito:', e));
     }
 
     form.reset();
@@ -520,19 +616,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     return ok;
   }
 
-  function unauthorizedHtml(prefix){
+  function showUnauthorized(loginSheet, content, prefix){
     const email = currentSession ? currentSession.user.email : '';
-    return `
+    loginSheet.style.display='block'; content.style.display='none';
+    loginSheet.innerHTML = `
       <div class="login-box">
         <h2 class="serif" style="margin-top:0;">Accesso non autorizzato</h2>
         <p class="hint">Sei collegato come <strong>${escapeHtml(email)}</strong>, ma questo account non è abilitato a gestire le prenotazioni.<br>Se pensi che sia un errore, contatta l'amministratore del sistema.</p>
         <button class="btn ghost" id="${prefix}-logout" style="width:100%;">Esci e accedi con un altro account</button>
       </div>`;
-  }
-
-  function showUnauthorized(loginSheet, content, prefix){
-    loginSheet.style.display='block'; content.style.display='none';
-    loginSheet.innerHTML = unauthorizedHtml(prefix);
     document.getElementById(prefix+'-logout').addEventListener('click', async ()=>{
       await sb.auth.signOut();
       refreshAuthUI();
@@ -585,6 +677,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
       currentSession = data.session;
     }
     renderWho();
+    updatePendingBadge();
     if(document.getElementById('page-report').classList.contains('active')) initReport();
     if(document.getElementById('page-approvazione').classList.contains('active')) initApprovazione();
   }
@@ -630,28 +723,59 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     if(list.length===0){ empty.style.display='block'; return; }
     empty.style.display='none';
 
-    const statusLabel = { confirmed:'Confermata', pending:'In attesa', rejected:'Rifiutata' };
     list.forEach(b=>{
       const tr = document.createElement('tr');
+      const esitoBtn = b.status !== 'pending'
+        ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${escapeHtml(gmailLink(esitoEmail(b)))}">✉ Invia esito</a>` : '';
+      const annullaBtn = (b.status === 'confirmed' || b.status === 'pending')
+        ? `<button class="btn ghost small" type="button" data-cancel="${b.id}">Annulla</button>` : '';
       tr.innerHTML = `
         <td>${fmtDate(b.data)}</td><td>${escapeHtml(b.orario)}</td><td>${escapeHtml(b.spazio)}</td>
         <td>${escapeHtml(b.tipo_evento)}</td><td>${escapeHtml(b.nome)}</td><td>${escapeHtml(b.telefono)}</td>
         <td>${escapeHtml(b.email)}</td>
-        <td><span class="status-tag ${b.status}">${statusLabel[b.status]||b.status}</span></td>`;
+        <td><span class="status-tag ${b.status}">${STATUS_LABEL[b.status]||b.status}</span></td>
+        <td class="azioni">${esitoBtn}${annullaBtn}</td>`;
       body.appendChild(tr);
     });
+
+    body.querySelectorAll('button[data-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const b = list.find(x=>x.id === btn.dataset.cancel);
+        if(b) annullaPrenotazione(b, btn);
+      });
+    });
+  }
+
+  // ---------- Annullamento (disdetta) ----------
+  async function annullaPrenotazione(b, btn){
+    const ok = confirm(`Annullare la prenotazione di ${b.nome}?\n\n${b.spazio}\n${fmtDate(b.data)} alle ${b.orario}\n\nLo slot verrà liberato e la prenotazione sparirà dal Calendario. Resterà visibile nel Report come "Annullata".`);
+    if(!ok) return;
+    const nota = prompt('Motivo dell\'annullamento (facoltativo, es. "disdetta del richiedente"):');
+    if(nota === null) return; // Annulla: nessuna modifica
+    btn.disabled = true;
+    const { data: updated, error } = await sb.from('prenotazioni')
+      .update({ status:'cancelled', nota_rifiuto: nota }).eq('id', b.id).select();
+    if(error || !updated || !updated.length){
+      console.error(error);
+      btn.disabled = false;
+      alert('Annullamento non riuscito. Se il problema persiste, verifica di aver eseguito lo script SQL per lo stato "annullata" (vedi istruzioni).');
+      return;
+    }
+    showEsitoPanel(updated[0], 'reportEsitoPanel');
+    renderReport();
+    updatePendingBadge();
   }
 
   document.getElementById('exportBtn').addEventListener('click', async ()=>{
     const list = await fetchAllBookings();
     if(!list.length){ alert('Nessuna prenotazione da esportare.'); return; }
-    const statusLabel = { confirmed:'Confermata', pending:'In attesa', rejected:'Rifiutata' };
+    const statusLabel = STATUS_LABEL;
     const rows = list.map(b=>({
       'Data': b.data, 'Orario': b.orario, 'Spazio': b.spazio, 'Evento': b.tipo_evento,
       'Nome e Cognome': b.nome, 'Indirizzo': b.indirizzo, 'CAP e Località': b.cap,
       'Telefono': b.telefono, 'Email': b.email, 'Email (dati anagrafici)': b.email2,
       'Referente visita/chiavi': b.contatto_visita, 'Stato': statusLabel[b.status]||b.status,
-      'Nota rifiuto': b.nota_rifiuto||'', 'Inviata il': b.created_at
+      'Nota (rifiuto/annullamento)': b.nota_rifiuto||'', 'Inviata il': b.created_at
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [{wch:11},{wch:8},{wch:22},{wch:28},{wch:20},{wch:22},{wch:16},{wch:14},{wch:24},{wch:24},{wch:30},{wch:12},{wch:24},{wch:20}];
@@ -715,26 +839,30 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     listEl.querySelectorAll('button[data-action]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         const id = btn.dataset.id;
-        const oldRecord = data.find(x=>x.id===id);
+        let patch;
         if(btn.dataset.action === 'approve'){
-          btn.disabled = true;
-          const { data: updated, error } = await sb.from('prenotazioni').update({ status:'confirmed' }).eq('id', id).select();
-          if(error) console.error(error);
-          if(updated && updated[0]){
-            sb.functions.invoke('notify', { body: { type:'UPDATE', table:'prenotazioni', record: updated[0], old_record: oldRecord } })
-              .catch(e=>console.error('Invio email fallito:', e));
-          }
-          renderApprovazione();
+          patch = { status:'confirmed' };
         } else {
-          const nota = prompt('Motivazione del rifiuto (facoltativa):') || '';
-          const { data: updated, error } = await sb.from('prenotazioni').update({ status:'rejected', nota_rifiuto: nota }).eq('id', id).select();
-          if(error) console.error(error);
-          if(updated && updated[0]){
-            sb.functions.invoke('notify', { body: { type:'UPDATE', table:'prenotazioni', record: updated[0], old_record: oldRecord } })
-              .catch(e=>console.error('Invio email fallito:', e));
-          }
-          renderApprovazione();
+          const nota = prompt('Motivazione del rifiuto (facoltativa):');
+          if(nota === null) return; // Annulla: nessuna modifica
+          patch = { status:'rejected', nota_rifiuto: nota };
         }
+        btn.disabled = true;
+        const { data: updated, error } = await sb.from('prenotazioni').update(patch).eq('id', id).select();
+        if(error){
+          console.error(error);
+          btn.disabled = false;
+          alert('Operazione non riuscita. Riprova.');
+          return;
+        }
+        if(!updated || !updated.length){
+          btn.disabled = false;
+          alert('Modifica non consentita: verifica che il tuo indirizzo sia tra i responsabili autorizzati.');
+          return;
+        }
+        showEsitoPanel(updated[0]);
+        renderApprovazione();
+        updatePendingBadge();
       });
     });
   }
