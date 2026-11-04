@@ -1,5 +1,5 @@
 # Evita che Supabase metta in pausa il progetto gratuito per inattività:
-# ogni lunedì e giovedì fa una piccola lettura sul database.
+# ogni 6 ore fa una piccola lettura sul database.
 name: Keep Supabase alive
 
 on:
