@@ -372,6 +372,18 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
 
   const STATUS_LABEL = { confirmed:'Confermata', pending:'In attesa', rejected:'Rifiutata', cancelled:'Annullata' };
 
+  // ---------- Pagamento (pagina con QR TWINT e tariffe) ----------
+  function motivazionePagamento(b){
+    const sala = (b.spazio||'').replace('Oratorio ','');
+    return `Affitto ${sala} ${fmtDate(b.data)} - ${b.nome}`;
+  }
+  function linkPagamento(b){
+    // indirizzo calcolato dalla pagina stessa: funziona sia in http sia in https
+    const u = new URL('pagamento.html', location.href);
+    u.search = 'rif=' + encodeURIComponent(motivazionePagamento(b));
+    return u.toString();
+  }
+
   // ---------- Email di esito (si invia a mano da Gmail) ----------
   function esitoEmail(b){
     const data = fmtDate(b.data);
@@ -383,7 +395,10 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
       body = `Gentile ${b.nome},\n\n`
         + `la Sua richiesta per ${b.spazio} del ${data} alle ${b.orario} (${b.tipo_evento}) è stata CONFERMATA.\n\n`
         + `Per la visita degli spazi e la consegna delle chiavi può contattare direttamente: ${b.contatto_visita || 'uno dei responsabili'}.\n`
-        + `Il contributo d'affitto va versato secondo le indicazioni della Casa della Gioventù e del regolamento.\n\n`
+        + `\nPAGAMENTO\n`
+        + `Il contributo d'affitto va versato al momento della conferma (art. 6 del regolamento) tramite TWINT. `
+        + `Il codice QR e le tariffe delle sale si trovano a questo link:\n${linkPagamento(b)}\n\n`
+        + `Come motivazione del pagamento indichi: ${motivazionePagamento(b)}\n\n`
         + `${segreteria}\n\n${firma}`;
     } else if(b.status === 'cancelled'){
       subject = `Prenotazione annullata — ${b.spazio}, ${data}`;

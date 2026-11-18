@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pagamento affitto sale — Casa della Gioventù</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --stone:#EAE3D3; --stone-dark:#DCD2BA;
+    --ink:#2B2A26; --ink-soft:#5B584E;
+    --burgundy:#7A2E2E; --sage:#5C7A52; --sage-dark:#456039;
+    --paper:#FBF9F4; --line:#CDC3A9;
+    --san-giovanni:#3C6E58; --santa-maria:#7A2E2E;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--stone);color:var(--ink);font-family:'Source Sans 3',sans-serif;font-size:16px;line-height:1.5;}
+  h1,h2,.serif{font-family:'Fraunces',serif;}
+  a{color:var(--burgundy);}
+  .shell{max-width:760px;margin:0 auto;padding:0 16px 60px;}
+  header{padding:32px 0 18px;border-bottom:2px solid var(--ink);margin-bottom:26px;}
+  header h1{font-size:1.6rem;font-weight:600;margin:0;}
+  header .sub{color:var(--ink-soft);font-size:0.95rem;margin-top:4px;}
+  .sheet{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:28px;}
+  .sheet + .sheet{margin-top:20px;}
+  h2{font-size:1.15rem;font-weight:600;margin:0 0 14px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+
+  .pay{display:grid;grid-template-columns:220px 1fr;gap:28px;align-items:start;}
+  @media (max-width:620px){.pay{grid-template-columns:1fr;}.qr{max-width:240px;margin:0 auto;}}
+  .qr img{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:var(--radius);background:#fff;}
+  ol.steps{margin:0;padding-left:20px;}
+  ol.steps li{margin-bottom:8px;}
+  .rif{margin-top:16px;padding:12px 14px;background:#EAF1E6;border:1px solid var(--sage);border-radius:var(--radius);}
+  .rif .lbl{font-size:0.82rem;color:var(--sage-dark);font-weight:600;}
+  .rif .val{font-size:1.05rem;font-weight:700;word-break:break-word;}
+  .rif button{margin-top:8px;font-family:inherit;font-size:0.85rem;font-weight:600;padding:5px 12px;border:1px solid var(--sage);background:#fff;color:var(--sage-dark);border-radius:var(--radius);cursor:pointer;}
+  .note{font-size:0.88rem;color:var(--ink-soft);margin-top:14px;}
+
+  .tables{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:620px){.tables{grid-template-columns:1fr;}}
+  .tab h3{font-family:'Fraunces',serif;font-size:1rem;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .tab h3 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .tab .addr{font-size:0.82rem;color:var(--ink-soft);margin-bottom:8px;}
+  table{width:100%;border-collapse:collapse;font-size:0.92rem;}
+  td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:top;}
+  td.price{text-align:right;white-space:nowrap;font-weight:700;padding-left:12px;font-variant-numeric:tabular-nums;}
+  tr:last-child td{border-bottom:none;}
+  .back{display:inline-block;margin-top:22px;font-size:0.92rem;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <h1>Pagamento dell'affitto</h1>
+    <div class="sub">Casa della Gioventù — Oratorio San Giovanni &amp; Oratorio Santa Maria, Mendrisio</div>
+  </header>
+
+  <div class="sheet">
+    <h2>Pagare con TWINT</h2>
+    <div class="pay">
+      <div class="qr"><img src="twint-qr.png" alt="Codice QR TWINT della Casa della Gioventù"></div>
+      <div>
+        <p style="margin-top:0;">Il contributo d'affitto va versato al momento della conferma della prenotazione (art. 6 del regolamento).</p>
+        <ol class="steps">
+          <li>Apri l'app <strong>TWINT</strong> sul telefono e scegli <strong>Scansiona</strong>.</li>
+          <li>Inquadra il codice QR di questa pagina.</li>
+          <li>Inserisci l'<strong>importo</strong> secondo le tariffe qui sotto.</li>
+          <li>Nella <strong>motivazione</strong> indica sala, data e nome, come scritto nell'email di conferma.</li>
+        </ol>
+        <div class="rif" id="rifBox" style="display:none;">
+          <div class="lbl">Motivazione da indicare</div>
+          <div class="val" id="rifVal"></div>
+          <button type="button" id="rifCopy">Copia motivazione</button>
+        </div>
+        <p class="note">Stai leggendo dal telefono? Apri questa pagina su un computer o un tablet e inquadra il codice con il telefono, oppure chiedi a qualcuno di mostrartelo.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>Tariffe</h2>
+    <div class="tables">
+      <div class="tab">
+        <h3><span class="dot" style="background:var(--san-giovanni)"></span>Oratorio San Giovanni</h3>
+        <div class="addr">via Vecchio Ginnasio 26</div>
+        <table>
+          <tr><td>Compleanni</td><td class="price">CHF 100.–</td></tr>
+          <tr><td>Compleanni sala + cucina</td><td class="price">CHF 150.–</td></tr>
+          <tr><td>Manifestazioni / eventi di associazioni</td><td class="price">CHF 300.–</td></tr>
+          <tr><td>Altre necessità</td><td class="price">da concordare</td></tr>
+        </table>
+      </div>
+      <div class="tab">
+        <h3><span class="dot" style="background:var(--santa-maria)"></span>Oratorio Santa Maria</h3>
+        <div class="addr">via Santa Maria 5</div>
+        <table>
+          <tr><td>Compleanni / conferenze / riunioni</td><td class="price">CHF 150.–</td></tr>
+          <tr><td>Pranzi o cene (cucina compresa)</td><td class="price">CHF 300.–</td></tr>
+          <tr><td>Manifestazioni / eventi di associazioni</td><td class="price">CHF 400.–</td></tr>
+          <tr><td>Altre necessità</td><td class="price">da concordare</td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="note">Per tutti gli affitti può essere richiesto un supplemento per consumi eccezionali (riscaldamento, elettricità) in caso di utilizzo prolungato o intensivo. In casi particolari il Consiglio Parrocchiale può accordare condizioni differenti.<br>
+    Dettagli nel <a href="regolamento-sale.pdf" target="_blank" rel="noopener">regolamento completo (PDF)</a>. Per informazioni: segretariato +41 91 646 88 69 (Lu–Ve 9.00–11.30).</p>
+  </div>
+
+  <a class="back" href="./">← Torna alla prenotazione delle sale</a>
+</div>
+
+<script>
+  // Mostra la motivazione personalizzata se il link dell'email la contiene (?rif=...)
+  (function(){
+    let rif = '';
+    try{ rif = new URLSearchParams(location.search).get('rif') || ''; }catch(e){}
+    rif = rif.trim().slice(0, 140);
+    if(!rif) return;
+    document.getElementById('rifVal').textContent = rif;
+    document.getElementById('rifBox').style.display = 'block';
+    document.getElementById('rifCopy').addEventListener('click', async (ev)=>{
+      let ok = false;
+      try{ await navigator.clipboard.writeText(rif); ok = true; }catch(e){}
+      ev.target.textContent = ok ? 'Copiata ✓' : 'Copia non riuscita';
+    });
+  })();
+</script>
+</body>
+</html>
