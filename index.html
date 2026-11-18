@@ -205,9 +205,10 @@
         <fieldset>
           <legend>Data e orario</legend>
           <div class="grid2">
-            <label class="field"><span class="lbl">Data desiderata <span class="req">*</span></span><input type="date" name="data" required></label>
+            <label class="field"><span class="lbl">Data desiderata <span class="req">*</span></span><input type="date" name="data" id="dataInput" required></label>
             <label class="field"><span class="lbl">Orario desiderato <span class="req">*</span></span><input type="time" name="orario" required></label>
           </div>
+          <p class="hint" id="dataHint" style="margin-top:-6px;">Le richieste vanno inoltrate almeno 15 giorni prima della data desiderata (art. 6 del regolamento). Per richieste urgenti: tel. +41 91 646 88 69 (Lu–Ve 9.00–11.30).</p>
         </fieldset>
 
         <fieldset>
@@ -254,7 +255,6 @@
         <fieldset>
           <legend>Ultime conferme</legend>
           <p class="hint" style="margin-top:-6px;margin-bottom:10px;">Il regolamento è disponibile qui: <a href="regolamento-sale.pdf" target="_blank" rel="noopener">Regolamento sale (PDF)</a>.</p>
-          <div class="check-row"><input type="checkbox" id="c4" name="confermaRegolamentoSale" required><label for="c4">Dichiaro di aver letto il regolamento per l'utilizzo delle sale</label></div>
           <div class="check-row"><input type="checkbox" id="c5" name="confermaOrariPubblico" required><label for="c5">Dichiaro di essere a conoscenza del fatto che il mercoledì, il sabato e la domenica l'Oratorio San Giovanni è aperto al pubblico dalle 14:00 alle 17:00 e che vanno rispettati</label></div>
         </fieldset>
 
@@ -486,10 +486,35 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
   const bannerErr = document.getElementById('bannerErr');
   const submitBtn = document.getElementById('submitBtn');
 
+  // ---------- Preavviso minimo di 15 giorni (art. 6 del regolamento) ----------
+  const GIORNI_PREAVVISO = 15;
+  const dataInput = document.getElementById('dataInput');
+  function primaDataPrenotabile(){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + GIORNI_PREAVVISO);
+    return d;
+  }
+  function aggiornaDataMinima(){
+    const min = primaDataPrenotabile();
+    const iso = `${min.getFullYear()}-${String(min.getMonth()+1).padStart(2,'0')}-${String(min.getDate()).padStart(2,'0')}`;
+    dataInput.min = iso;
+    const [y,m,d] = iso.split('-');
+    dataInput.setCustomValidity(
+      dataInput.value && dataInput.value < iso
+        ? `Le richieste vanno inoltrate almeno ${GIORNI_PREAVVISO} giorni prima: la prima data disponibile è il ${d}/${m}/${y}. Per urgenze chiamare il +41 91 646 88 69.`
+        : ''
+    );
+  }
+  aggiornaDataMinima();
+  dataInput.addEventListener('input', aggiornaDataMinima);
+  dataInput.addEventListener('change', aggiornaDataMinima);
+
   form.addEventListener('submit', async function(e){
     e.preventDefault();
     bannerOk.style.display='none';
     bannerErr.style.display='none';
+    aggiornaDataMinima(); // ricalcola nel caso la pagina sia rimasta aperta da ieri
 
     if(!form.checkValidity()){
       form.reportValidity();
@@ -516,7 +541,8 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
       conferma_regolamento: fd.get('confermaRegolamento')==='on',
       conferma_prezzi: fd.get('confermaPrezzi')==='on',
       conferma_quiete: fd.get('confermaQuiete')==='on',
-      conferma_regolamento_sale: fd.get('confermaRegolamentoSale')==='on',
+      // un'unica casella "regolamento" compila entrambi i campi del database
+      conferma_regolamento_sale: fd.get('confermaRegolamento')==='on',
       conferma_orari_pubblico: fd.get('confermaOrariPubblico')==='on',
       status: 'pending'
     };
