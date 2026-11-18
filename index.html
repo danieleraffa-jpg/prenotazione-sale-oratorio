@@ -72,6 +72,11 @@
   .radio-row input,.check-row input{margin-top:3px;}
   .radio-row label,.check-row label{font-size:0.94rem;cursor:pointer;}
   .hint{font-size:0.82rem;color:var(--ink-soft);margin-top:3px;}
+  .doc-link{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:12px;border:1px solid var(--line);border-left:3px solid var(--burgundy);border-radius:var(--radius);background:#fff;color:var(--ink);text-decoration:none;}
+  .doc-link:hover{background:#F4F0E4;}
+  .doc-link .doc-icon{font-family:'Source Sans 3',sans-serif;font-size:0.7rem;font-weight:700;color:#fff;background:var(--burgundy);border-radius:2px;padding:3px 6px;}
+  .doc-link strong{display:block;font-size:0.95rem;}
+  .doc-link span.sub{font-size:0.82rem;color:var(--ink-soft);}
 
   .btn{font-family:'Source Sans 3',sans-serif;font-weight:600;font-size:0.95rem;padding:11px 22px;border-radius:var(--radius);border:1px solid var(--burgundy);background:var(--burgundy);color:#fff;cursor:pointer;}
   .btn:hover{background:var(--burgundy-dark);}
@@ -225,6 +230,11 @@
 
         <fieldset>
           <legend>Regolamento e prezzi</legend>
+          <a class="doc-link" href="regolamento-sale.pdf" target="_blank" rel="noopener">
+            <span class="doc-icon">PDF</span>
+            <span><strong>Leggi il regolamento con le tariffe delle sale</strong>
+            <span class="sub">Si apre in una nuova scheda — da leggere prima di confermare</span></span>
+          </a>
           <div class="check-row"><input type="checkbox" id="c1" name="confermaRegolamento" required><label for="c1">Confermo di aver letto il regolamento</label></div>
           <div class="check-row"><input type="checkbox" id="c2" name="confermaPrezzi" required><label for="c2">Confermo di essere a conoscenza dei prezzi delle sale</label></div>
         </fieldset>
@@ -243,6 +253,7 @@
 
         <fieldset>
           <legend>Ultime conferme</legend>
+          <p class="hint" style="margin-top:-6px;margin-bottom:10px;">Il regolamento è disponibile qui: <a href="regolamento-sale.pdf" target="_blank" rel="noopener">Regolamento sale (PDF)</a>.</p>
           <div class="check-row"><input type="checkbox" id="c4" name="confermaRegolamentoSale" required><label for="c4">Dichiaro di aver letto il regolamento per l'utilizzo delle sale</label></div>
           <div class="check-row"><input type="checkbox" id="c5" name="confermaOrariPubblico" required><label for="c5">Dichiaro di essere a conoscenza del fatto che il mercoledì, il sabato e la domenica l'Oratorio San Giovanni è aperto al pubblico dalle 14:00 alle 17:00 e che vanno rispettati</label></div>
         </fieldset>
