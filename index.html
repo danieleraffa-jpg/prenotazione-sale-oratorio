@@ -6,8 +6,9 @@
 <title>Prenotazione sale — Oratori di Mendrisio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Librerie copiate nel sito (versione fissa): xlsx 0.18.5, supabase-js 2.119.2 -->
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/supabase.js"></script>
 <style>
   :root{
     --stone:#EAE3D3; --stone-dark:#DCD2BA;
@@ -354,6 +355,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
 /* ============================================================ */
 
+// Impedisce che l'app venga caricata dentro un iframe di un altro sito (clickjacking)
+if (window.top !== window.self) { window.top.location = window.location.href; }
+
 (function(){
   const configOk = !SUPABASE_URL.startsWith('INSERISCI') && !SUPABASE_ANON_KEY.startsWith('INSERISCI');
   if(!configOk){ document.getElementById('configWarning').style.display='block'; }
@@ -569,6 +573,11 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
 
     if(error){
       console.error(error);
+      if(error.message && error.message.indexOf('Troppe richieste') !== -1){
+        bannerErr.textContent = error.message + '. Per informazioni: tel. +41 91 646 88 69 (Lu–Ve 9.00–11.30).';
+      } else {
+        bannerErr.textContent = "Alcuni campi obbligatori non sono stati compilati, oppure c'è stato un problema di connessione. Controlla il modulo e riprova.";
+      }
       bannerErr.style.display='block';
       return;
     }
@@ -599,7 +608,7 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
     if(sb){
       const start = isoOf(new Date(calCursor.getFullYear(), calCursor.getMonth()-1, 1));
       const end = isoOf(new Date(calCursor.getFullYear(), calCursor.getMonth()+2, 0));
-      const { data, error } = await sb.from('prenotazioni').select('*').eq('status','confirmed').gte('data', start).lte('data', end);
+      const { data, error } = await sb.from('prenotazioni').select('id,data,orario,spazio,tipo_evento,status').eq('status','confirmed').gte('data', start).lte('data', end);
       if(!error) list = data || [];
     }
 
@@ -622,7 +631,7 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
       (byDate[iso]||[]).forEach(b=>{
         const chip = document.createElement('span');
         chip.className = 'chip ' + (b.spazio.includes('Giovanni') ? 'sg' : 'sm');
-        chip.textContent = (b.orario||'') + ' ' + b.nome;
+        chip.textContent = (b.orario||'') + ' Occupato';
         chip.addEventListener('click', ()=>showDayList(iso, byDate[iso]));
         cell.appendChild(chip);
       });
@@ -643,8 +652,8 @@ const GMAIL_ACCOUNT = 'amministrazioneparrocchiale@gmail.com';
     bookings.forEach(b=>{
       const row = document.createElement('div');
       row.className='booking-row';
-      row.innerHTML = `<div><strong>${b.orario||'—'} · ${escapeHtml(b.spazio)}</strong>
-        <div class="meta">${escapeHtml(b.nome)} · ${escapeHtml(b.tipo_evento||'')}</div></div>
+      row.innerHTML = `<div><strong>${escapeHtml(b.orario||'—')} · ${escapeHtml(b.spazio)}</strong>
+        <div class="meta">Occupato · ${escapeHtml(b.tipo_evento||'')}</div></div>
         <span class="status-tag confirmed">Confermata</span>`;
       body.appendChild(row);
     });
